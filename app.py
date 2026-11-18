@@ -18,8 +18,7 @@ security = Security()
 login_manager = LoginManager()
 
 csrf = CSRFProtect()
-
-#user_datastore = None
+ 
 
 def create_app(): 
     app = Flask(__name__, template_folder = 'templates')
@@ -63,9 +62,9 @@ def create_app():
     @app.cli.command("seed")
     @with_appcontext
     def seed(): 
-        #print("starting seeding")
+        
         seed_database(user_datastore)
-        #print("finished seeding")
+        
 
     return app 
 
