@@ -76,8 +76,6 @@ class StudentProfile(db.Model):
     backref=db.backref('student_profile', uselist=False)
     )
 
-     
-      
 
 class ExaminerProfile(db.Model): 
     __tablename__ = 'examiner_profiles'
@@ -111,3 +109,64 @@ class Course(db.Model):
 
     semester = db.Column(db.String(20), nullable=False)
     year_of_study = db.Column(db.Integer, nullable=False)
+
+
+class ExaminationSlot(db.Model): 
+    __tablename__ = 'examination_slots'
+    slot_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    exam_id = db.Column(db.Integer, db.ForeignKey('examinations.id'), nullable=False)
+
+    examiner_id = db.Column(
+            db.Integer,
+            db.ForeignKey('examiner_profiles.id'),
+            nullable=False
+        )
+
+    slot_date = db.Column(db.DateTime, nullable=False)
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
+    available_seats = db.Column(db.Integer, nullable=False)
+
+    status = db.Column(db.String(50), nullable=False, default='Scheduled')  # e.g., "Scheduled", "Completed", "Cancelled"
+
+    examiner = db.relationship('ExaminerProfile')
+    exam = db.relationship('Examination', backref='slots')
+
+     
+      
+
+class Booking(db.Model): 
+    __tablename__ = 'bookings'
+    __table_args__ = (
+    db.UniqueConstraint(
+        'student_id',
+        'slot_id',
+        name='unique_student_slot'
+    ),
+)
+    
+    booking_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    slot_id = db.Column(db.Integer, db.ForeignKey('examination_slots.slot_id'), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey('student_profiles.id'), nullable=False)
+    
+    booked_at = db.Column(db.DateTime)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+    cancellation_reason = db.Column(db.Text, nullable=True)
+
+    status = db.Column(db.String(50), nullable=False, default='Booked')  # e.g., "Booked", "Cancelled", "Completed"
+
+    slot = db.relationship('ExaminationSlot', backref='bookings')
+    student = db.relationship('StudentProfile', backref='bookings')
+
+
+class ExaminationRubrics(db.Model): 
+    __tablename__ = 'examination_rubrics'
+    rubric_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    exam_id = db.Column(db.Integer, db.ForeignKey('examinations.id'), nullable=False)
+
+    criteria = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    weightage = db.Column(db.Float, nullable=False)
+    max_marks = db.Column(db.Integer, nullable=False)
+
+    display_order = db.Column(db.Integer, nullable=False)
