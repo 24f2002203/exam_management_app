@@ -1,11 +1,22 @@
 from datetime import datetime
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app as app, abort
-from flask_security import auth_required, current_user, roles_required, hash_password
+
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask_security import auth_required, current_user, roles_required
+from flask_security.utils import hash_password
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
-from core.models import User, Course, Examination, ExaminerProfile, StudentProfile, ExaminationSlot, ExaminationRubrics, Booking, BookingReschedules, Role
-from core.database import db 
-from .forms import CourseForm, add_error, ExaminationForm, TIMELINE_FIELDS, TimelineForm, RubricForm, ExaminerCreateForm, ExaminerProfileForm, StudentProfileForm
+
+from core.database import db
+from core.models import (
+    Booking, BookingReschedules, Course, Examination, ExaminationRubrics,
+    ExaminationSlot, ExaminerProfile, Role, SlotExaminerChanges,
+    StudentProfile, User,
+)
+from .forms import (
+    TIMELINE_FIELDS, ChangeExaminerForm, CourseForm, ExaminationForm,
+    ExaminerCreateForm, ExaminerProfileForm, RescheduleForm, RubricForm,
+    StudentProfileForm, TimelineForm, add_error,
+)
 
 SEARCH_LIMIT = 20
 PER_PAGE = 25
@@ -595,3 +606,145 @@ def view_all_slots():
 def slot_detail(slot_id):
     slot = db.get_or_404(ExaminationSlot, slot_id)
     return render_template('admin/slot_detail.html', slot=slot)
+
+@blueprint.route('/slots/<int:slot_id>/change-examiner', methods=['GET', 'POST'])
+def change_slot_examiner(slot_id):
+    slot = db.get_or_404(ExaminationSlot, slot_id)
+    back = url_for('admin.slot_detail', slot_id=slot.slot_id)
+
+    if slot.status != 'Scheduled':
+        flash('Only scheduled slots can change examiner.', 'danger')
+        return redirect(back)
+
+    # Active, approved examiners other than the current one
+    candidates = (ExaminerProfile.query.join(User)
+                  .filter(User.active.is_(True), User.status == 'approved',
+                          ExaminerProfile.id != slot.examiner_id)
+                  .order_by(User.first_name, User.last_name).all())
+    if not candidates:
+        flash('There is no other active, approved examiner to assign.', 'danger')
+        return redirect(back)
+
+    form = ChangeExaminerForm()
+    form.new_examiner_id.choices = [
+        (e.id, f'{e.user.first_name} {e.user.last_name} ({e.department})') for e in candidates]
+
+    if form.validate_on_submit():
+        new_id = form.new_examiner_id.data
+
+        # keep a record of the change
+        db.session.add(SlotExaminerChanges(
+            slot_id=slot.slot_id,
+            old_examiner_id=slot.examiner_id,
+            new_examiner_id=new_id,
+            change_reason=form.reason.data.strip(),
+        ))
+        slot.examiner_id = new_id
+
+        # evaluations that are still waiting follow the new examiner
+        for booking in slot.bookings:
+            for evaluation in booking.evaluations:
+                if evaluation.status == 'Pending':
+                    evaluation.examiner_id = new_id
+
+        if save('Examiner changed.'):
+            return redirect(back)
+
+    return render_template('admin/form.html', form=form,
+                           title=f'Change examiner for slot {slot.slot_id}', cancel_url=back)
+
+
+@blueprint.route('/bookings')
+def view_all_bookings():
+    q = request.args.get('q', '').strip()
+    exam_id = request.args.get('exam_id', type=int)
+    status = request.args.get('status', '').strip() or None
+    page_number = request.args.get('page', 1, type=int)
+
+    query = (Booking.query
+             .join(StudentProfile, Booking.student_id == StudentProfile.id)
+             .join(User, StudentProfile.user_id == User.id)
+             .join(ExaminationSlot, Booking.slot_id == ExaminationSlot.slot_id)
+             .join(Examination, ExaminationSlot.exam_id == Examination.id))
+
+    if q:
+        query = query.filter(search_filter(q, [User.first_name, User.last_name, FULL_NAME,
+                                               StudentProfile.roll_number, Examination.exam_name]))
+    if exam_id:
+        query = query.filter(Examination.id == exam_id)
+    if status:
+        query = query.filter(Booking.status == status)
+
+    page = query.order_by(Booking.booking_id.desc()).paginate(
+        page=page_number, per_page=PER_PAGE, error_out=False)
+    return render_template('admin/bookings.html', page=page, q=q, exam_id=exam_id, status=status)
+
+
+@blueprint.route('/bookings/<int:booking_id>')
+def booking_detail(booking_id):
+    booking = db.get_or_404(Booking, booking_id)
+    return render_template('admin/booking_detail.html', booking=booking)
+
+
+@blueprint.route('/bookings/<int:booking_id>/reschedule', methods=['GET', 'POST'])
+def reschedule_booking(booking_id):
+    booking = db.get_or_404(Booking, booking_id)
+    back = url_for('admin.booking_detail', booking_id=booking.booking_id)
+
+    if booking.status != 'Booked':
+        flash('Only active bookings can be rescheduled.', 'danger')
+        return redirect(back)
+
+    # Other scheduled slots of the same exam that still have free seats
+    slots = (ExaminationSlot.query
+             .filter(ExaminationSlot.exam_id == booking.slot.exam_id,
+                     ExaminationSlot.slot_id != booking.slot_id,
+                     ExaminationSlot.status == 'Scheduled',
+                     ExaminationSlot.available_seats > 0)
+             .order_by(ExaminationSlot.slot_date, ExaminationSlot.start_time).all())
+    if not slots:
+        flash('No other slot with free seats exists for this examination.', 'danger')
+        return redirect(back)
+
+    form = RescheduleForm()
+    form.new_slot_id.choices = [
+        (s.slot_id,
+         f'Slot {s.slot_id}: {s.slot_date:%d %b %Y} {s.start_time:%H:%M}-{s.end_time:%H:%M}, '
+         f'{s.examiner.user.first_name} {s.examiner.user.last_name}, {s.available_seats} seats left')
+        for s in slots]
+
+    if form.validate_on_submit():
+        new_slot = db.session.get(ExaminationSlot, form.new_slot_id.data)
+        already_booked = Booking.query.filter_by(
+            student_id=booking.student_id, slot_id=new_slot.slot_id).first()
+
+        if new_slot.available_seats < 1:
+            add_error(form.new_slot_id, 'That slot just filled up. Pick another.')
+        elif already_booked:
+            add_error(form.new_slot_id, 'This student already has a booking record for that slot.')
+        else:
+            old_slot = booking.slot
+
+            # keep a record of the move
+            db.session.add(BookingReschedules(
+                booking_id=booking.booking_id,
+                old_slot_id=old_slot.slot_id,
+                new_slot_id=new_slot.slot_id,
+                reschedule_reason=form.reason.data.strip(),
+            ))
+
+            # update seats and the booking itself
+            old_slot.available_seats += 1
+            new_slot.available_seats -= 1
+            booking.slot_id = new_slot.slot_id
+
+            # evaluations that are still waiting follow the new examiner
+            for evaluation in booking.evaluations:
+                if evaluation.status == 'Pending':
+                    evaluation.examiner_id = new_slot.examiner_id
+
+            if save('Booking rescheduled.'):
+                return redirect(back)
+
+    return render_template('admin/form.html', form=form,
+                           title=f'Reschedule booking {booking.booking_id}', cancel_url=back)

@@ -6,8 +6,6 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional
 
-from wtforms.validators import DataRequired, Length, NumberRange, Optional
-
 DT_FORMAT = '%Y-%m-%dT%H:%M'
 EXAM_TYPES = [(t, t) for t in ( 'Viva', 'Practical', 'Project')]
 EXAM_STATUSES = [(s, s) for s in ('Scheduled', 'Completed', 'Cancelled')]
@@ -116,3 +114,14 @@ class StudentProfileForm(FlaskForm):
     semester = StringField('Semester', validators=[DataRequired(), Length(max=20)])
     year_of_study = IntegerField('Year of study', validators=[DataRequired(), NumberRange(min=1, max=8)])
     submit = SubmitField('Save student')
+
+class RescheduleForm(FlaskForm):
+    new_slot_id = SelectField('New slot', coerce=int, validators=[DataRequired()])
+    reason = TextAreaField('Reason for rescheduling', validators=[DataRequired(), Length(max=1000)])
+    submit = SubmitField('Reschedule booking')
+
+
+class ChangeExaminerForm(FlaskForm):
+    new_examiner_id = SelectField('New examiner', coerce=int, validators=[DataRequired()])
+    reason = TextAreaField('Reason for the change', validators=[DataRequired(), Length(max=1000)])
+    submit = SubmitField('Change examiner')
