@@ -1,0 +1,17 @@
+{% extends 'student/base.html' %}
+{% block title %}Student Dashboard{% endblock %}
+
+{% block content %}
+<h1>Student Dashboard</h1>
+
+<p>Welcome, {{ current_user.first_name }} {{ current_user.last_name }}</p>
+<p>Roll number: {{ student.roll_number }} | {{ student.program }} | {{ student.department }}</p>
+<p>Active bookings: {{ booked_count }}</p>
+
+<ul>
+    <li><a href="{{ url_for('student.examinations') }}">Browse available examinations</a></li>
+    <li><a href="{{ url_for('student.bookings') }}">My bookings</a></li>
+    <li><a href="{{ url_for('student.history') }}">Examination history</a></li>
+    <li><a href="{{ url_for('student.results') }}">Results and feedback</a></li>
+</ul>
+{% endblock %}
