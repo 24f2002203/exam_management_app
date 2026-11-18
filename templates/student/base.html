@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Student{% endblock %}</title>
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <nav>
+        <a href="{{ url_for('student.dashboard') }}">Home</a> |
+        <a href="{{ url_for('student.examinations') }}">Examinations</a> |
+        <a href="{{ url_for('student.bookings') }}">My Bookings</a> |
+        <a href="{{ url_for('student.history') }}">History</a> |
+        <a href="{{ url_for('student.results') }}">Results</a> |
+        <a href="{{ url_for('security.logout') }}">Logout</a>
+    </nav>
+    <hr>
+    {% endif %}
+
+    {% for message in get_flashed_messages() %}
+        <p><strong>{{ message }}</strong></p>
+    {% endfor %}
+
+    {% block content %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slots</title>
+</head>
+<body>
+<p><a href="{{ url_for('admin.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>All Slots{% if exam %} for {{ exam.exam_name }}{% endif %}</h1>
+
+{% if exam %}
+    <p><a href="{{ url_for('admin.view_all_slots') }}">Show slots for all examinations</a></p>
+{% endif %}
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Slot</th>
+            <th>Examination</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Examiner</th>
+            <th>Seats left</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for slot in page.items %}
+        <tr>
+            <td><a href="{{ url_for('admin.slot_detail', slot_id=slot.slot_id) }}">{{ slot.slot_id }}</a></td>
+            <td>{{ slot.exam.exam_name }}</td>
+            <td>{{ slot.slot_date.strftime('%d %b %Y') }}</td>
+            <td>{{ slot.start_time.strftime('%H:%M') }} - {{ slot.end_time.strftime('%H:%M') }}</td>
+            <td>{{ slot.examiner.user.first_name }} {{ slot.examiner.user.last_name }}</td>
+            <td>{{ slot.available_seats }}</td>
+            <td>{{ slot.status }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No slots found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p>
+    {% if page.has_prev %}<a href="{{ url_for(request.endpoint, **dict(request.args.to_dict(), page=page.prev_num)) }}">Previous</a>{% endif %}
+    Page {{ page.page }} of {{ page.pages }}
+    {% if page.has_next %}<a href="{{ url_for(request.endpoint, **dict(request.args.to_dict(), page=page.next_num)) }}">Next</a>{% endif %}
+</p>
+</body>
+</html>

@@ -576,3 +576,22 @@ def user_action(user_id, action):
     if action != 'reject' and role == 'student':
         return redirect(url_for('admin.view_all_students'))
     return redirect(url_for('admin.pending_users'))
+
+@blueprint.route('/slots')
+def view_all_slots():
+    exam_id = request.args.get('exam_id', type=int)
+    page_number = request.args.get('page', 1, type=int)
+    exam = db.session.get(Examination, exam_id) if exam_id else None
+
+    query = ExaminationSlot.query
+    if exam_id:
+        query = query.filter(ExaminationSlot.exam_id == exam_id)
+    page = query.order_by(ExaminationSlot.slot_date, ExaminationSlot.start_time).paginate(
+        page=page_number, per_page=PER_PAGE, error_out=False)
+    return render_template('admin/slots.html', page=page, exam=exam)
+
+
+@blueprint.route('/slots/<int:slot_id>')
+def slot_detail(slot_id):
+    slot = db.get_or_404(ExaminationSlot, slot_id)
+    return render_template('admin/slot_detail.html', slot=slot)

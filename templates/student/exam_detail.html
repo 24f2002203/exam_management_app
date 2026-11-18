@@ -1,0 +1,56 @@
+{% extends 'student/base.html' %}
+{% block title %}{{ exam.exam_name }}{% endblock %}
+
+{% block content %}
+<h1>{{ exam.exam_name }}</h1>
+
+<p>Course: {{ exam.course.course_code }} - {{ exam.course.course_name }}</p>
+<p>Type: {{ exam.exam_type }} | Maximum marks: {{ exam.max_marks }} | Duration: {{ exam.duration }} minutes</p>
+<p>Date: {{ exam.exam_date.strftime('%d %b %Y') }} | Venue: {{ exam.venue }}</p>
+<p>Booking window: {{ exam.booking_starts_at.strftime('%d %b %Y, %H:%M') }}
+   to {{ exam.booking_ends_at.strftime('%d %b %Y, %H:%M') }}</p>
+{% if exam.description %}<p>{{ exam.description }}</p>{% endif %}
+
+{% if my_booking %}
+    <p><strong>You have booked a slot for this examination.</strong>
+       <a href="{{ url_for('student.bookings') }}">View booking</a></p>
+{% elif not is_open %}
+    <p><strong>Booking is not open for this examination.</strong></p>
+{% endif %}
+
+<h2>Available slots</h2>
+
+<table border="1" cellpadding="5">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Examiner</th>
+            <th>Seats left</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for slot in slots %}
+        <tr>
+            <td>{{ slot.slot_date.strftime('%d %b %Y') }}</td>
+            <td>{{ slot.start_time.strftime('%H:%M') }} - {{ slot.end_time.strftime('%H:%M') }}</td>
+            <td>{{ slot.examiner.user.first_name }} {{ slot.examiner.user.last_name }}</td>
+            <td>{{ slot.available_seats }}</td>
+            <td>
+                {% if is_open and not my_booking %}
+                <form method="POST" action="{{ url_for('student.book', slot_id=slot.slot_id) }}">
+                    {{ form.hidden_tag() }}
+                    <button type="submit">Book</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+    {% else %}
+        <tr><td colspan="5">No slots available.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<p><a href="{{ url_for('student.examinations') }}">Back to examinations</a></p>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends 'student/base.html' %}
+{% block title %}Examination History{% endblock %}
+
+{% block content %}
+<h1>Examination History</h1>
+
+<table border="1" cellpadding="5">
+    <thead>
+        <tr>
+            <th>Sno.</th>
+            <th>Examination</th>
+            <th>Course</th>
+            <th>Date</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for booking in bookings %}
+        {% set exam = booking.slot.exam %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ exam.exam_name }}</td>
+            <td>{{ exam.course.course_code }} - {{ exam.course.course_name }}</td>
+            <td>{{ booking.slot.slot_date.strftime('%d %b %Y') }}</td>
+            <td>{{ booking.status }}</td>
+        </tr>
+    {% else %}
+        <tr><td colspan="5">No examination history yet.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

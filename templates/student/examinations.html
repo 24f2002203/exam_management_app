@@ -1,0 +1,49 @@
+{% extends 'student/base.html' %}
+{% block title %}Available Examinations{% endblock %}
+
+{% block content %}
+<h1>Available Examinations</h1>
+
+<form method="GET">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search by exam or course">
+    <select name="exam_type">
+        <option value="">All types</option>
+        {% for t in exam_types %}
+            <option value="{{ t }}" {% if t == exam_type %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Search</button>
+    <a href="{{ url_for('student.examinations') }}">Clear</a>
+</form>
+
+<table border="1" cellpadding="5">
+    <thead>
+        <tr>
+            <th>Sno.</th>
+            <th>Examination</th>
+            <th>Course</th>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Venue</th>
+            <th>Booking closes</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for exam in exams %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ exam.exam_name }}</td>
+            <td>{{ exam.course.course_code }} - {{ exam.course.course_name }}</td>
+            <td>{{ exam.exam_type }}</td>
+            <td>{{ exam.exam_date.strftime('%d %b %Y') }}</td>
+            <td>{{ exam.venue }}</td>
+            <td>{{ exam.booking_ends_at.strftime('%d %b %Y, %H:%M') }}</td>
+            <td><a href="{{ url_for('student.exam_detail', exam_id=exam.id) }}">View slots</a></td>
+        </tr>
+    {% else %}
+        <tr><td colspan="8">No examinations found.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

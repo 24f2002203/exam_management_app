@@ -1,0 +1,46 @@
+{% extends 'student/base.html' %}
+{% block title %}My Bookings{% endblock %}
+
+{% block content %}
+<h1>My Bookings</h1>
+
+<table border="1" cellpadding="5">
+    <thead>
+        <tr>
+            <th>Sno.</th>
+            <th>Examination</th>
+            <th>Slot</th>
+            <th>Status</th>
+            <th>Cancel</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for booking in bookings %}
+        {% set exam = booking.slot.exam %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ exam.exam_name }} ({{ exam.course.course_code }})</td>
+            <td>
+                {{ booking.slot.slot_date.strftime('%d %b %Y') }},
+                {{ booking.slot.start_time.strftime('%H:%M') }} - {{ booking.slot.end_time.strftime('%H:%M') }}
+            </td>
+            <td>{{ booking.status }}</td>
+            <td>
+                {% if booking.status == 'Booked' and now <= exam.booking_ends_at %}
+                <form method="POST" action="{{ url_for('student.cancel', booking_id=booking.booking_id) }}">
+                    {{ form.hidden_tag() }}
+                    {{ form.reason(rows=1, placeholder='Reason (optional)') }}
+                    <button type="submit">Cancel</button>
+                </form>
+                <small>Until {{ exam.booking_ends_at.strftime('%d %b %Y, %H:%M') }}</small>
+                {% elif booking.status == 'Booked' %}
+                <small>Deadline passed</small>
+                {% endif %}
+            </td>
+        </tr>
+    {% else %}
+        <tr><td colspan="5">You have no bookings yet.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
