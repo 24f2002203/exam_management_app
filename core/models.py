@@ -3,8 +3,6 @@ import  os, sys, uuid
 from core.database import db
 from datetime import datetime, UTC
 
-# Association table
-# Primary key on user_id ensures one role per user.
 user_roles = db.Table(
     'user_roles',
     db.Column(
@@ -110,6 +108,34 @@ class Course(db.Model):
     semester = db.Column(db.String(20), nullable=False)
     year_of_study = db.Column(db.Integer, nullable=False)
 
+class Examination(db.Model):
+    __tablename__ = 'examinations'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+
+    exam_name = db.Column(db.String(255), nullable=False)
+    exam_type = db.Column(db.String(50), nullable=False)  # e.g., "Midterm", "Final"
+    max_marks = db.Column(db.Integer, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+
+    exam_date = db.Column(db.DateTime, nullable=False)
+    start_time = db.Column(db.Time, nullable=False)
+    duration = db.Column(db.Integer, nullable=False)  # Duration in minutes
+    venue = db.Column(db.String(255), nullable=False)
+
+    max_students = db.Column(db.Integer, nullable=False)
+    slot_creation_starts_at = db.Column(db.DateTime, nullable=False)
+    slot_creation_ends_at = db.Column(db.DateTime, nullable=False)
+    booking_starts_at = db.Column(db.DateTime, nullable=False)
+    booking_ends_at = db.Column(db.DateTime, nullable=False)
+    slot_creation_open = db.Column(db.Boolean, default=False)
+    booking_open = db.Column(db.Boolean, default=False)
+
+    results_published = db.Column(db.Boolean, default=False)
+    status = db.Column(db.String(50), nullable=False, default='Scheduled')  # e.g., "Scheduled", "Completed", "Cancelled"
+
+    course = db.relationship('Course', backref='examinations')
+
 
 class ExaminationSlot(db.Model): 
     __tablename__ = 'examination_slots'
@@ -170,3 +196,55 @@ class ExaminationRubrics(db.Model):
     max_marks = db.Column(db.Integer, nullable=False)
 
     display_order = db.Column(db.Integer, nullable=False)
+
+class BookingReschedules(db.Model): 
+    __tablename__ = 'booking_reschedules'
+    reschedule_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.booking_id'), nullable=False)
+    old_slot_id = db.Column(db.Integer, db.ForeignKey('examination_slots.slot_id'), nullable=False)
+    new_slot_id = db.Column(db.Integer, db.ForeignKey('examination_slots.slot_id'), nullable=False)
+
+    reschedule_reason = db.Column(db.Text, nullable=True)
+    rescheduled_at = db.Column(
+    db.DateTime(timezone=True),
+    default=lambda: datetime.now(UTC)
+)
+    booking = db.relationship('Booking', backref='reschedules')
+
+    old_slot = db.relationship(
+        'ExaminationSlot',
+        foreign_keys=[old_slot_id]
+    )
+
+    new_slot = db.relationship(
+        'ExaminationSlot',
+        foreign_keys=[new_slot_id]
+    )
+
+class SlotExaminerChanges(db.Model): 
+    __tablename__ = 'slot_examiner_changes'
+    change_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    slot_id = db.Column(db.Integer, db.ForeignKey('examination_slots.slot_id'), nullable=False)
+    old_examiner_id = db.Column(db.Integer, db.ForeignKey('examiner_profiles.id'), nullable=False)
+    new_examiner_id = db.Column(db.Integer, db.ForeignKey('examiner_profiles.id'), nullable=False)
+
+    change_reason = db.Column(db.Text, nullable=True)
+    changed_at = db.Column(
+    db.DateTime(timezone=True),
+    default=lambda: datetime.now(UTC)
+)
+
+    slot = db.relationship(
+    'ExaminationSlot',
+    backref='examiner_changes'
+    )
+
+    old_examiner = db.relationship(
+        'ExaminerProfile',
+        foreign_keys=[old_examiner_id]
+    )
+
+    new_examiner = db.relationship(
+        'ExaminerProfile',
+        foreign_keys=[new_examiner_id]
+    )
