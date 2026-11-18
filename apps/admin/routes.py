@@ -1,11 +1,11 @@
 from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app as app, abort
-from flask_security import auth_required, current_user, roles_required
+from flask_security import auth_required, current_user, roles_required, hash_password
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
-from core.models import User, Course, Examination, ExaminerProfile, StudentProfile, ExaminationSlot, ExaminationRubrics, Booking, BookingReschedules
+from core.models import User, Course, Examination, ExaminerProfile, StudentProfile, ExaminationSlot, ExaminationRubrics, Booking, BookingReschedules, Role
 from core.database import db 
-from .forms import CourseForm, add_error, ExaminationForm, TIMELINE_FIELDS, TimelineForm, RubricForm, ExaminerCreateForm, ExaminerProfileForm
+from .forms import CourseForm, add_error, ExaminationForm, TIMELINE_FIELDS, TimelineForm, RubricForm, ExaminerCreateForm, ExaminerProfileForm, StudentProfileForm
 
 SEARCH_LIMIT = 20
 PER_PAGE = 25
@@ -478,3 +478,101 @@ def pending_users():
 
     users = User.query.filter_by(status=status).order_by(User.id).all()
     return render_template('admin/pending_users.html', users=users, status=status)
+
+@blueprint.route('/users/<int:user_id>/approve', methods=['GET', 'POST'])
+def approve_user(user_id):
+    """Approving creates the examiner or student profile the rest of the app needs."""
+    user = db.get_or_404(User, user_id)
+    role = user.roles[0].name if user.roles else None
+    title = f'Approve {user.first_name} {user.last_name} as {role}'
+    back = url_for('admin.pending_users')
+
+    if role == 'examiner':
+        profile = user.examiner_profile
+        form = ExaminerProfileForm(obj=profile)
+        course_choices(form.courses)
+
+        if request.method == 'GET' and profile:
+            form.courses.data = [c.id for c in profile.courses]
+
+        if form.validate_on_submit():
+            profile = profile or ExaminerProfile(user=user)
+            profile.department = form.department.data.strip()
+            profile.designation = form.designation.data.strip()
+            profile.courses = Course.query.filter(Course.id.in_(form.courses.data or [])).all()
+
+            user.status = 'approved'
+            user.active = True
+            db.session.add(profile)
+            if save(f'{user.email} approved.', 'Could not approve this user.'):
+                return redirect(back)
+
+        return render_template('admin/form.html', form=form, title=title, cancel_url=back)
+
+    if role == 'student':
+        profile = user.student_profile
+        form = StudentProfileForm(obj=profile)
+
+        if form.validate_on_submit():
+            roll_number = form.roll_number.data.strip()
+            profile_id = profile.id if profile else 0
+            taken = StudentProfile.query.filter(
+                StudentProfile.roll_number == roll_number,
+                StudentProfile.id != profile_id).first()
+
+            if taken:
+                add_error(form.roll_number, 'This roll number is already in use.')
+            else:
+                profile = profile or StudentProfile(user=user)
+                profile.roll_number = roll_number
+                profile.department = form.department.data.strip()
+                profile.program = form.program.data.strip()
+                profile.semester = form.semester.data.strip()
+                profile.year_of_study = form.year_of_study.data
+
+                user.status = 'approved'
+                user.active = True
+                db.session.add(profile)
+                if save(f'{user.email} approved.', 'Could not approve this user.'):
+                    return redirect(back)
+
+        return render_template('admin/form.html', form=form, title=title, cancel_url=back)
+
+    abort(400)
+
+
+@blueprint.route('/users/<int:user_id>/<action>', methods=['POST'])
+def user_action(user_id, action):
+    if action not in ('reject', 'deactivate', 'activate'):
+        abort(404)
+
+    user = db.get_or_404(User, user_id)
+    role = user.roles[0].name if user.roles else None
+
+    # Admins and yourself cannot be changed here.
+    if role == 'admin' or user.id == current_user.id:
+        abort(403)
+
+    if action == 'reject':
+        user.status = 'rejected'
+        message = f'{user.email} rejected.'
+    elif action == 'activate':
+        user.active = True
+        message = f'{user.email} activated.'
+    else:
+        user.active = False
+        message = f'{user.email} deactivated.'
+        if user.examiner_profile:
+            pending = ExaminationSlot.query.filter_by(
+                examiner_id=user.examiner_profile.id, status='Scheduled').count()
+            if pending:
+                flash(f'This examiner still has {pending} scheduled slot(s). '
+                      'Assign another examiner to them.', 'warning')
+
+    save(message)
+
+    if action != 'reject' and role == 'examiner':
+        return redirect(url_for('admin.view_all_examiners'))
+    if action != 'reject' and role == 'student':
+        return redirect(url_for('admin.view_all_students'))
+    return redirect(url_for('admin.pending_users'))

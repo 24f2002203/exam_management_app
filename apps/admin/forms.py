@@ -101,3 +101,18 @@ class ExaminerCreateForm(FlaskForm):
     designation = StringField('Designation', validators=[DataRequired(), Length(max=255)])
     courses = SelectMultipleField('Assigned courses', coerce=int, validators=[Optional()])
     submit = SubmitField('Add examiner')
+
+    
+class ExaminerProfileForm(FlaskForm):
+    department = StringField('Department', validators=[DataRequired(), Length(max=255)])
+    designation = StringField('Designation', validators=[DataRequired(), Length(max=255)])
+    courses = SelectMultipleField('Assigned courses', coerce=int, validators=[Optional()])
+    submit = SubmitField('Save examiner')
+
+class StudentProfileForm(FlaskForm):
+    roll_number = StringField('Roll number', validators=[DataRequired(), Length(max=20)])
+    department = StringField('Department', validators=[DataRequired(), Length(max=255)])
+    program = StringField('Program', validators=[DataRequired(), Length(max=255)])
+    semester = StringField('Semester', validators=[DataRequired(), Length(max=20)])
+    year_of_study = IntegerField('Year of study', validators=[DataRequired(), NumberRange(min=1, max=8)])
+    submit = SubmitField('Save student')
