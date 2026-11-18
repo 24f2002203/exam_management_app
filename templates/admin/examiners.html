@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examiners</title>
+</head>
+<body>
+<p><a href="{{ url_for('admin.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>All Examiners</h1>
+
+<form method="get">
+    <input name="q" value="{{ q }}" placeholder="Search examiners">
+    <button type="submit">Search</button>
+</form>
+
+<p><a href="{{ url_for('admin.create_examiner') }}">Add an examiner</a></p>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Department</th>
+            <th>Designation</th>
+            <th>Courses</th>
+            <th>Active</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for e in page.items %}
+        <tr>
+            <td>{{ e.user.first_name }} {{ e.user.last_name }}</td>
+            <td>{{ e.user.email }}</td>
+            <td>{{ e.department }}</td>
+            <td>{{ e.designation }}</td>
+            <td>{% for c in e.courses %}{{ c.course_code }} {% endfor %}</td>
+            <td>{{ e.user.active }}</td>
+            <td>
+                <a href="{{ url_for('admin.update_examiner', examiner_id=e.id) }}">Edit</a>
+                {% if e.user.active %}
+<form method="post" action="{{ url_for('admin.user_action', user_id=e.user.id, action='deactivate') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Deactivate</button>
+</form>
+{% else %}
+<form method="post" action="{{ url_for('admin.user_action', user_id=e.user.id, action='activate') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Activate</button>
+</form>
+{% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No examiners found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p>
+    {% if page.has_prev %}<a href="{{ url_for(request.endpoint, **dict(request.args.to_dict(), page=page.prev_num)) }}">Previous</a>{% endif %}
+    Page {{ page.page }} of {{ page.pages }}
+    {% if page.has_next %}<a href="{{ url_for(request.endpoint, **dict(request.args.to_dict(), page=page.next_num)) }}">Next</a>{% endif %}
+</p>
+</body>
+</html>

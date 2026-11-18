@@ -1,10 +1,11 @@
 from datetime import datetime
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app as app 
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app as app, abort
+from flask_security import auth_required, current_user, roles_required
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from core.models import User, Course, Examination, ExaminerProfile, StudentProfile, ExaminationSlot, ExaminationRubrics, Booking, BookingReschedules
 from core.database import db 
-from .forms import CourseForm, add_error, ExaminationForm, TIMELINE_FIELDS
+from .forms import CourseForm, add_error, ExaminationForm, TIMELINE_FIELDS, TimelineForm, RubricForm
 
 SEARCH_LIMIT = 20
 PER_PAGE = 25
@@ -271,3 +272,130 @@ def delete_examination(exam_id):
     db.session.delete(exam)
     save('Examination deleted.', 'Could not delete the examination.')
     return redirect(url_for('admin.view_all_examinations'))
+
+@blueprint.route('/examinations/<int:exam_id>/timeline', methods=['GET', 'POST'])
+def update_timeline(exam_id):
+    exam = db.get_or_404(Examination, exam_id)
+    form = TimelineForm(obj=exam)
+    back = url_for('admin.examination_detail', exam_id=exam.id)
+
+    if form.validate_on_submit():
+        for name in TIMELINE_FIELDS:
+            setattr(exam, name, getattr(form, name).data)
+        if save('Timeline updated.'):
+            return redirect(back)
+
+    return render_template('admin/form.html', form=form, title=f'Timeline for {exam.exam_name}',
+                           cancel_url=back)
+
+
+@blueprint.route('/examinations/<int:exam_id>/<phase>/<state>', methods=['POST'])
+def set_phase(exam_id, phase, state):
+    """Manually open or close slot creation or booking for an exam."""
+    if phase not in ('slot-creation', 'booking') or state not in ('open', 'close'):
+        abort(404)
+
+    exam = db.get_or_404(Examination, exam_id)
+    opening = state == 'open'
+
+    if opening and exam.status != 'Scheduled':
+        flash(f'Cannot open this phase for a {exam.status.lower()} examination.', 'danger')
+    elif opening and phase == 'booking' and not exam.slots:
+        flash('Cannot open booking: no examiner has created slots yet.', 'danger')
+    else:
+        word = 'opened' if opening else 'closed'
+        if phase == 'slot-creation':
+            exam.slot_creation_open = opening
+            save(f'Slot creation {word}.')
+        else:
+            exam.booking_open = opening
+            save(f'Booking {word}.')
+
+    return redirect(url_for('admin.examination_detail', exam_id=exam.id))
+
+@blueprint.route('/examinations/<int:exam_id>/rubrics/create', methods=['GET', 'POST'])
+def create_rubric(exam_id):
+    exam = db.get_or_404(Examination, exam_id)
+    form = RubricForm()
+    back = url_for('admin.examination_detail', exam_id=exam.id)
+    rubrics = ExaminationRubrics.query.filter_by(exam_id=exam.id).all()
+
+    if request.method == 'GET':
+        form.display_order.data = max([r.display_order for r in rubrics], default=0) + 1
+
+    if form.validate_on_submit():
+        remaining = exam.max_marks - sum(r.max_marks for r in rubrics)
+
+        if form.max_marks.data > remaining:
+            add_error(form.max_marks,
+                      f"Only {remaining} of the examination's {exam.max_marks} marks are unassigned.")
+        else:
+            rubric = ExaminationRubrics(exam_id=exam.id)
+            rubric.criteria = form.criteria.data.strip()
+            rubric.description = (form.description.data or '').strip() or None
+            rubric.weightage = form.weightage.data
+            rubric.max_marks = form.max_marks.data
+            rubric.display_order = form.display_order.data
+            db.session.add(rubric)
+            if save('Rubric added.'):
+                return redirect(back)
+
+    return render_template('admin/form.html', form=form, title=f'Add rubric to {exam.exam_name}',
+                           cancel_url=back)
+
+@blueprint.route('/rubrics/<int:rubric_id>/edit', methods=['GET', 'POST'])
+def update_rubric(rubric_id):
+    rubric = db.get_or_404(ExaminationRubrics, rubric_id)
+    exam = db.get_or_404(Examination, rubric.exam_id)
+    form = RubricForm(obj=rubric)
+    back = url_for('admin.examination_detail', exam_id=exam.id)
+
+    if form.validate_on_submit():
+        # marks used by the OTHER rubrics of this exam
+        others = ExaminationRubrics.query.filter(
+            ExaminationRubrics.exam_id == exam.id,
+            ExaminationRubrics.rubric_id != rubric.rubric_id).all()
+        remaining = exam.max_marks - sum(r.max_marks for r in others)
+
+        if form.max_marks.data > remaining:
+            add_error(form.max_marks,
+                      f"Only {remaining} of the examination's {exam.max_marks} marks are unassigned.")
+        else:
+            rubric.criteria = form.criteria.data.strip()
+            rubric.description = (form.description.data or '').strip() or None
+            rubric.weightage = form.weightage.data
+            rubric.max_marks = form.max_marks.data
+            rubric.display_order = form.display_order.data
+            if save('Rubric updated.'):
+                return redirect(back)
+
+    return render_template('admin/form.html', form=form, title='Edit rubric', cancel_url=back)
+
+
+@blueprint.route('/rubrics/<int:rubric_id>/delete', methods=['POST'])
+def delete_rubric(rubric_id):
+    rubric = db.get_or_404(ExaminationRubrics, rubric_id)
+    exam_id = rubric.exam_id
+
+    if rubric.scores:
+        flash('This rubric already has evaluation scores and cannot be deleted.', 'danger')
+    else:
+        db.session.delete(rubric)
+        save('Rubric deleted.', 'Could not delete the rubric.')
+
+    return redirect(url_for('admin.examination_detail', exam_id=exam_id))
+
+
+@blueprint.route('/examiners')
+def view_all_examiners():
+    q = request.args.get('q', '').strip()
+    page_number = request.args.get('page', 1, type=int)
+
+    query = ExaminerProfile.query.join(User)
+    if q:
+        query = query.filter(search_filter(q, [User.first_name, User.last_name, FULL_NAME,
+                                               User.email, ExaminerProfile.department,
+                                               ExaminerProfile.designation]))
+    page = query.order_by(User.first_name, User.last_name).paginate(
+        page=page_number, per_page=PER_PAGE, error_out=False)
+    return render_template('admin/examiners.html', page=page, q=q)

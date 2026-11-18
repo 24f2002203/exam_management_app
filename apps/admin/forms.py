@@ -1,7 +1,8 @@
 from flask_wtf import FlaskForm
 from wtforms import (
     IntegerField,StringField, SubmitField,TextAreaField, 
-    SelectField, DateField, TimeField, DateTimeLocalField)
+    SelectField, DateField, TimeField, DateTimeLocalField, 
+    FloatField)
 
 from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
@@ -68,3 +69,15 @@ class ExaminationForm(FlaskForm):
 
     def validate(self, extra_validators=None):
         return super().validate(extra_validators) and check_timeline(self)
+
+
+class TimelineForm(FlaskForm):
+    slot_creation_starts_at = timeline_field('Examiner slot creation opens')
+    slot_creation_ends_at = timeline_field('Examiner slot creation closes')
+    booking_starts_at = timeline_field('Student booking opens')
+    booking_ends_at = timeline_field('Student booking closes')
+    submit = SubmitField('Save timeline')
+
+    def validate(self, extra_validators=None):
+        return super().validate(extra_validators) and check_timeline(self), 
+        FloatField

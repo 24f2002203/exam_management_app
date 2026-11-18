@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ exam.exam_name }}</title>
+</head>
+<body>
+<p><a href="{{ url_for('examiner.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>{{ exam.exam_name }}</h1>
+
+<ul>
+    <li>Course: {{ exam.course.course_code }} - {{ exam.course.course_name }}</li>
+    <li>Date: {{ exam.exam_date.strftime('%d %b %Y') }}, {{ exam.start_time.strftime('%H:%M') }}</li>
+    <li>Venue: {{ exam.venue }}</li>
+    <li>Maximum students: {{ exam.max_students }}</li>
+    <li>Slot creation: {{ exam.slot_creation_starts_at }} to {{ exam.slot_creation_ends_at }}</li>
+    <li>Results published: {{ exam.results_published }}</li>
+</ul>
+
+<h2>My slots</h2>
+
+{% if can_create %}
+    <p><a href="{{ url_for('examiner.create_slot', exam_id=exam.id) }}">Add a slot</a></p>
+{% else %}
+    <p>Slot creation is not open.</p>
+{% endif %}
+
+{% for slot in slots %}
+    <h3>
+        {{ slot.slot_date.strftime('%d %b %Y') }},
+        {{ slot.start_time.strftime('%H:%M') }} - {{ slot.end_time.strftime('%H:%M') }}
+        ({{ slot.available_seats }} seats left, {{ slot.status }})
+    </h3>
+
+    {% if not change_error(slot) %}
+        <a href="{{ url_for('examiner.edit_slot', slot_id=slot.slot_id) }}">Edit</a>
+<form method="post" action="{{ url_for('examiner.delete_slot', slot_id=slot.slot_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Delete</button>
+</form>
+    {% endif %}
+
+    <ul>
+        {% for b in slot.bookings %}
+            <li>
+                {{ b.student.user.first_name }} {{ b.student.user.last_name }}
+                ({{ b.student.roll_number }}) - {{ b.status }}
+                {% if b.status != 'Cancelled' %}
+                    <a href="{{ url_for('examiner.evaluate', booking_id=b.booking_id) }}">Evaluate</a>
+                {% endif %}
+            </li>
+        {% else %}
+            <li>No bookings.</li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>You have no slots for this examination.</p>
+{% endfor %}
+</body>
+</html>
