@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Students</title>
+</head>
+<body>
+<p><a href="{{ url_for('admin.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>All Students</h1>
+
+<form method="get">
+    <input name="q" value="{{ q }}" placeholder="Search students">
+    <button type="submit">Search</button>
+</form>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Roll number</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Department</th>
+            <th>Program</th>
+            <th>Semester</th>
+            <th>Year</th>
+            <th>Active</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in page.items %}
+        <tr>
+            <td>{{ s.roll_number }}</td>
+            <td>{{ s.user.first_name }} {{ s.user.last_name }}</td>
+            <td>{{ s.user.email }}</td>
+            <td>{{ s.department }}</td>
+            <td>{{ s.program }}</td>
+            <td>{{ s.semester }}</td>
+            <td>{{ s.year_of_study }}</td>
+            <td>{{ s.user.active }}</td>
+            <td>
+                {% if s.user.active %}
+<form method="post" action="{{ url_for('admin.user_action', user_id=s.user.id, action='deactivate') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Deactivate</button>
+</form>
+{% else %}
+<form method="post" action="{{ url_for('admin.user_action', user_id=s.user.id, action='activate') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Activate</button>
+</form>
+{% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9">No students found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p>
+    {% if page.has_prev %}<a href="{{ url_for(request.endpoint, **dict(request.args.to_dict(), page=page.prev_num)) }}">Previous</a>{% endif %}
+    Page {{ page.page }} of {{ page.pages }}
+    {% if page.has_next %}<a href="{{ url_for(request.endpoint, **dict(request.args.to_dict(), page=page.next_num)) }}">Next</a>{% endif %}
+</p>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users</title>
+</head>
+<body>
+<p><a href="{{ url_for('admin.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>{{ status|capitalize }} users</h1>
+
+<p>
+    <a href="{{ url_for('admin.pending_users', status='pending') }}">Pending</a>
+    <a href="{{ url_for('admin.pending_users', status='rejected') }}">Rejected</a>
+</p>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td>{{ user.first_name }} {{ user.last_name }}</td>
+            <td>{{ user.email }}</td>
+            <td>{{ user.roles[0].name if user.roles else '' }}</td>
+            <td>
+                <a href="{{ url_for('admin.approve_user', user_id=user.id) }}">Approve</a>
+                {% if status == 'pending' %}
+                <form method="post" action="{{ url_for('admin.user_action', user_id=user.id, action='reject') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Reject</button>
+</form>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">No users.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</body>
+</html>

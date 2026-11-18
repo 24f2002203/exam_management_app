@@ -5,7 +5,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from core.models import User, Course, Examination, ExaminerProfile, StudentProfile, ExaminationSlot, ExaminationRubrics, Booking, BookingReschedules
 from core.database import db 
-from .forms import CourseForm, add_error, ExaminationForm, TIMELINE_FIELDS, TimelineForm, RubricForm
+from .forms import CourseForm, add_error, ExaminationForm, TIMELINE_FIELDS, TimelineForm, RubricForm, ExaminerCreateForm, ExaminerProfileForm
 
 SEARCH_LIMIT = 20
 PER_PAGE = 25
@@ -399,3 +399,82 @@ def view_all_examiners():
     page = query.order_by(User.first_name, User.last_name).paginate(
         page=page_number, per_page=PER_PAGE, error_out=False)
     return render_template('admin/examiners.html', page=page, q=q)
+
+
+@blueprint.route('/examiners/create', methods=['GET', 'POST'])
+def create_examiner():
+    form = ExaminerCreateForm()
+    course_choices(form.courses)
+
+    if form.validate_on_submit():
+        email = form.email.data.strip().lower()
+        role = Role.query.filter_by(name='examiner').first()
+
+        if User.query.filter_by(email=email).first():
+            add_error(form.email, 'A user with this email already exists.')
+        elif not role:
+            flash('The examiner role is not configured. Run the seed command.', 'danger')
+        else:
+            user = User(
+                first_name=form.first_name.data.strip().title(),
+                last_name=form.last_name.data.strip().title(),
+                email=email,
+                password=hash_password(form.password.data),
+                roles=[role],
+                status='approved',
+                active=True,
+            )
+            profile = ExaminerProfile(user=user)
+            profile.department = form.department.data.strip()
+            profile.designation = form.designation.data.strip()
+            profile.courses = Course.query.filter(Course.id.in_(form.courses.data or [])).all()
+            db.session.add_all([user, profile])
+            if save('Examiner added.', 'Could not add the examiner.'):
+                return redirect(url_for('admin.view_all_examiners'))
+
+    return render_template('admin/form.html', form=form, title='Add examiner',
+                           cancel_url=url_for('admin.view_all_examiners'))
+
+@blueprint.route('/examiners/<int:examiner_id>/edit', methods=['GET', 'POST'])
+def update_examiner(examiner_id):
+    profile = db.get_or_404(ExaminerProfile, examiner_id)
+    form = ExaminerProfileForm(obj=profile)
+    course_choices(form.courses)
+
+    if request.method == 'GET':
+        form.courses.data = [c.id for c in profile.courses]
+
+    if form.validate_on_submit():
+        profile.department = form.department.data.strip()
+        profile.designation = form.designation.data.strip()
+        profile.courses = Course.query.filter(Course.id.in_(form.courses.data or [])).all()
+        if save('Examiner updated.'):
+            return redirect(url_for('admin.view_all_examiners'))
+
+    return render_template('admin/form.html', form=form,
+                           title=f'Edit {profile.user.first_name} {profile.user.last_name}',
+                           cancel_url=url_for('admin.view_all_examiners'))
+
+
+@blueprint.route('/students')
+def view_all_students():
+    q = request.args.get('q', '').strip()
+    page_number = request.args.get('page', 1, type=int)
+
+    query = StudentProfile.query.join(User)
+    if q:
+        query = query.filter(search_filter(q, [User.first_name, User.last_name, FULL_NAME,
+                                               User.email, StudentProfile.roll_number]))
+    page = query.order_by(User.first_name, User.last_name).paginate(
+        page=page_number, per_page=PER_PAGE, error_out=False)
+    return render_template('admin/students.html', page=page, q=q)
+
+
+@blueprint.route('/users/pending')
+def pending_users():
+    status = request.args.get('status', 'pending')
+    if status not in ('pending', 'rejected'):
+        status = 'pending'
+
+    users = User.query.filter_by(status=status).order_by(User.id).all()
+    return render_template('admin/pending_users.html', users=users, status=status)

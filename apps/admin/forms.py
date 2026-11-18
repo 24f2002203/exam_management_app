@@ -1,8 +1,10 @@
 from flask_wtf import FlaskForm
 from wtforms import (
-    IntegerField,StringField, SubmitField,TextAreaField, 
-    SelectField, DateField, TimeField, DateTimeLocalField, 
-    FloatField)
+    DateField, DateTimeLocalField, EmailField, FloatField, IntegerField,
+    PasswordField, SelectField, SelectMultipleField, StringField, SubmitField,
+    TextAreaField, TimeField,
+)
+from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional
 
 from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
@@ -71,6 +73,14 @@ class ExaminationForm(FlaskForm):
         return super().validate(extra_validators) and check_timeline(self)
 
 
+class RubricForm(FlaskForm):
+    criteria = StringField('Criteria', validators=[DataRequired(), Length(max=500)])
+    description = TextAreaField('Description', validators=[Optional(), Length(max=2000)])
+    weightage = FloatField('Weightage (%)', validators=[DataRequired(), NumberRange(min=0, max=100)])
+    max_marks = IntegerField('Maximum marks', validators=[DataRequired(), NumberRange(min=1)])
+    display_order = IntegerField('Display order', validators=[DataRequired(), NumberRange(min=1)])
+    submit = SubmitField('Save rubric')
+
 class TimelineForm(FlaskForm):
     slot_creation_starts_at = timeline_field('Examiner slot creation opens')
     slot_creation_ends_at = timeline_field('Examiner slot creation closes')
@@ -79,5 +89,15 @@ class TimelineForm(FlaskForm):
     submit = SubmitField('Save timeline')
 
     def validate(self, extra_validators=None):
-        return super().validate(extra_validators) and check_timeline(self), 
-        FloatField
+        return super().validate(extra_validators) and check_timeline(self)
+
+
+class ExaminerCreateForm(FlaskForm):
+    first_name = StringField('First name', validators=[DataRequired(), Length(min=2, max=50)])
+    last_name = StringField('Last name', validators=[DataRequired(), Length(min=2, max=50)])
+    email = EmailField('Email', validators=[DataRequired(), Email()])
+    password = PasswordField('Temporary password', validators=[DataRequired(), Length(min=8)])
+    department = StringField('Department', validators=[DataRequired(), Length(max=255)])
+    designation = StringField('Designation', validators=[DataRequired(), Length(max=255)])
+    courses = SelectMultipleField('Assigned courses', coerce=int, validators=[Optional()])
+    submit = SubmitField('Add examiner')
