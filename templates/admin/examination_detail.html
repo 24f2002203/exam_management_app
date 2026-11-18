@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ exam.exam_name }}</title>
+</head>
+<body>
+<p><a href="{{ url_for('admin.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>{{ exam.exam_name }}</h1>
+
+<p>
+    <a href="{{ url_for('admin.update_examination', exam_id=exam.id) }}">Edit</a>
+    <a href="{{ url_for('admin.view_all_slots', exam_id=exam.id) }}">View slots</a>
+    <a href="{{ url_for('admin.view_all_bookings', exam_id=exam.id) }}">View bookings</a>
+</p>
+<form method="post" action="{{ url_for('admin.delete_examination', exam_id=exam.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Delete examination</button>
+</form>
+
+<h2>Details</h2>
+<ul>
+    <li>Course: {{ exam.course.course_code }} - {{ exam.course.course_name }}</li>
+    <li>Type: {{ exam.exam_type }}</li>
+    <li>Maximum marks: {{ exam.max_marks }}</li>
+    <li>Date: {{ exam.exam_date.strftime('%d %b %Y') }}</li>
+    <li>Start time: {{ exam.start_time.strftime('%H:%M') }}</li>
+    <li>Duration: {{ exam.duration }} minutes</li>
+    <li>Venue: {{ exam.venue }}</li>
+    <li>Maximum students: {{ exam.max_students }}</li>
+    <li>Status: {{ exam.status }}</li>
+    <li>Results published: {{ exam.results_published }}</li>
+    <li>Description: {{ exam.description or '-' }}</li>
+</ul>
+
+<h2>Timeline</h2>
+<p><a href="{{ url_for('admin.update_timeline', exam_id=exam.id) }}">Edit timeline</a></p>
+<ul>
+    <li>Slot creation: {{ exam.slot_creation_starts_at }} to {{ exam.slot_creation_ends_at }}</li>
+    <li>Booking: {{ exam.booking_starts_at }} to {{ exam.booking_ends_at }}</li>
+</ul>
+
+<h2>Phases</h2>
+<p>Slot creation is {{ 'open' if exam.slot_creation_open else 'closed' }}.</p>
+{% if exam.slot_creation_open %}
+<form method="post" action="{{ url_for('admin.set_phase', exam_id=exam.id, phase='slot-creation', state='close') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Close slot creation</button>
+</form>
+{% else %}
+<form method="post" action="{{ url_for('admin.set_phase', exam_id=exam.id, phase='slot-creation', state='open') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Open slot creation</button>
+</form>
+{% endif %}
+<p>Booking is {{ 'open' if exam.booking_open else 'closed' }}.</p>
+{% if exam.booking_open %}
+<form method="post" action="{{ url_for('admin.set_phase', exam_id=exam.id, phase='booking', state='close') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Close booking</button>
+</form>
+{% else %}
+<form method="post" action="{{ url_for('admin.set_phase', exam_id=exam.id, phase='booking', state='open') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Open booking</button>
+</form>
+{% endif %}
+
+<h2>Rubrics ({{ rubric_total }} of {{ exam.max_marks }} marks assigned)</h2>
+<p><a href="{{ url_for('admin.create_rubric', exam_id=exam.id) }}">Add a rubric</a></p>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Order</th>
+            <th>Criteria</th>
+            <th>Description</th>
+            <th>Weightage (%)</th>
+            <th>Max marks</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in rubrics %}
+        <tr>
+            <td>{{ r.display_order }}</td>
+            <td>{{ r.criteria }}</td>
+            <td>{{ r.description or '-' }}</td>
+            <td>{{ r.weightage }}</td>
+            <td>{{ r.max_marks }}</td>
+            <td>
+                <a href="{{ url_for('admin.update_rubric', rubric_id=r.rubric_id) }}">Edit</a>
+                <form method="post" action="{{ url_for('admin.delete_rubric', rubric_id=r.rubric_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Delete</button>
+</form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No rubrics yet.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examinations</title>
+</head>
+<body>
+<p><a href="{{ url_for('admin.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>All Examinations</h1>
+
+<form method="get">
+    <input name="q" value="{{ q }}" placeholder="Search examinations">
+    <button type="submit">Search</button>
+</form>
+
+<p><a href="{{ url_for('admin.create_examination') }}">Add an examination</a></p>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Course</th>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Venue</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for exam in page.items %}
+        <tr>
+            <td><a href="{{ url_for('admin.examination_detail', exam_id=exam.id) }}">{{ exam.exam_name }}</a></td>
+            <td>{{ exam.course.course_code }}</td>
+            <td>{{ exam.exam_type }}</td>
+            <td>{{ exam.exam_date.strftime('%d %b %Y') }}</td>
+            <td>{{ exam.venue }}</td>
+            <td>{{ exam.status }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No examinations found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p>
+    {% if page.has_prev %}<a href="{{ url_for(request.endpoint, **dict(request.args.to_dict(), page=page.prev_num)) }}">Previous</a>{% endif %}
+    Page {{ page.page }} of {{ page.pages }}
+    {% if page.has_next %}<a href="{{ url_for(request.endpoint, **dict(request.args.to_dict(), page=page.next_num)) }}">Next</a>{% endif %}
+</p>
+</body>
+</html>

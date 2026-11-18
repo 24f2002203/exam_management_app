@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+</head>
+<body>
+
+    <h1>{{ title }}</h1>
+
+    <form method="POST">
+
+        {{ form.hidden_tag() }}
+
+        {% for field in form %}
+            {% if field.type != 'CSRFTokenField'
+                  and field.type != 'SubmitField' %}
+                <p>
+                    {{ field.label }}
+                    {{ field() }}
+
+                    {% for error in field.errors %}
+                        <span>{{ error }}</span>
+                    {% endfor %}
+                </p>
+            {% endif %}
+        {% endfor %}
+
+        <button type="submit">Approve</button>
+
+    </form>
+
+    <a href="{{ cancel_url }}">Cancel</a>
+
+</body>
+</html>

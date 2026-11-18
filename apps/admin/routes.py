@@ -1,12 +1,16 @@
+from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app as app 
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from core.models import User, Course, Examination, ExaminerProfile, StudentProfile, ExaminationSlot, ExaminationRubrics, Booking, BookingReschedules
 from core.database import db 
-from .forms import CourseForm, add_error
+from .forms import CourseForm, add_error, ExaminationForm, TIMELINE_FIELDS
 
 SEARCH_LIMIT = 20
 PER_PAGE = 25
+FULL_NAME = User.first_name + ' ' + User.last_name
+
+blueprint = Blueprint('admin', __name__, url_prefix='/admin')
 
 
 def search_filter(q, columns):
@@ -23,6 +27,17 @@ def save(success, failure='Could not save the changes.'):
     flash(success, 'success')
     return True
 
+@blueprint.before_request
+@auth_required()
+@roles_required('admin')
+def require_admin():
+    pass
+
+
+def course_choices(field):
+    courses = Course.query.order_by(Course.course_code).all()
+    field.choices = [(c.id, f'{c.course_code} - {c.course_name}') for c in courses]
+
 
 def fill_course(course, form):
     course.course_code = form.course_code.data.strip().upper()
@@ -33,6 +48,22 @@ def fill_course(course, form):
     course.credits = form.credits.data
     course.semester = form.semester.data.strip()
     course.year_of_study = form.year_of_study.data
+
+
+def fill_exam(exam, form):
+    exam.course_id = form.course_id.data
+    exam.exam_name = form.exam_name.data.strip()
+    exam.exam_type = form.exam_type.data
+    exam.max_marks = form.max_marks.data
+    exam.description = (form.description.data or '').strip() or None
+    exam.exam_date = datetime.combine(form.exam_date.data, datetime.min.time())
+    exam.start_time = form.start_time.data
+    exam.duration = form.duration.data
+    exam.venue = form.venue.data.strip()
+    exam.max_students = form.max_students.data
+    exam.status = form.status.data
+    for name in TIMELINE_FIELDS:
+        setattr(exam, name, getattr(form, name).data)
 
 blueprint = Blueprint(
     'admin', 
@@ -134,3 +165,109 @@ def create_course():
 
     return render_template('admin/form.html', form=form, title='Create course',
                            cancel_url=url_for('admin.view_all_courses'))
+
+@blueprint.route('/courses/<int:course_id>/edit', methods=['GET', 'POST'])
+def update_course(course_id):
+    course = db.get_or_404(Course, course_id)
+    form = CourseForm(obj=course)
+
+    if form.validate_on_submit():
+        code = form.course_code.data.strip().upper()
+        other = Course.query.filter(Course.course_code == code, Course.id != course.id).first()
+        if other:
+            add_error(form.course_code, 'Another course already uses this code.')
+        else:
+            fill_course(course, form)
+            if save('Course updated.'):
+                return redirect(url_for('admin.view_all_courses'))
+
+    return render_template('admin/form.html', form=form, title=f'Edit course {course.course_code}',
+                           cancel_url=url_for('admin.view_all_courses'))
+
+@blueprint.route('/courses/<int:course_id>/delete', methods=['POST'])
+def delete_course(course_id):
+    course = db.get_or_404(Course, course_id)
+
+    if course.examinations:
+        flash('This course has examinations and cannot be deleted.', 'danger')
+    else:
+        db.session.delete(course)
+        save('Course deleted.', 'Could not delete the course.')
+
+    return redirect(url_for('admin.view_all_courses'))
+
+@blueprint.route('/examinations')
+def view_all_examinations():
+    q = request.args.get('q', '').strip()
+    page_number = request.args.get('page', 1, type=int)
+
+    query = Examination.query.join(Course)
+    if q:
+        query = query.filter(search_filter(q, [Examination.exam_name, Examination.exam_type,
+                                               Examination.venue, Course.course_code,
+                                               Course.course_name]))
+    page = query.order_by(Examination.exam_date.desc()).paginate(
+        page=page_number, per_page=PER_PAGE, error_out=False)
+    return render_template('admin/examinations.html', page=page, q=q)
+
+@blueprint.route('/examinations/create', methods=['GET', 'POST'])
+def create_examination():
+    if not Course.query.first():
+        flash('Create a course first, then add its examinations.', 'danger')
+        return redirect(url_for('admin.create_course'))
+
+    form = ExaminationForm()
+    course_choices(form.course_id)
+
+    if form.validate_on_submit():
+        exam = Examination()
+        fill_exam(exam, form)
+        db.session.add(exam)
+        if save('Examination created. Add its rubrics next.'):
+            return redirect(url_for('admin.examination_detail', exam_id=exam.id))
+
+    return render_template('admin/form.html', form=form, title='Create examination',
+                           cancel_url=url_for('admin.view_all_examinations'))
+
+@blueprint.route('/examinations/<int:exam_id>')
+def examination_detail(exam_id):
+    exam = db.get_or_404(Examination, exam_id)
+    rubrics = (ExaminationRubrics.query.filter_by(exam_id=exam.id)
+               .order_by(ExaminationRubrics.display_order).all())
+    rubric_total = sum(r.max_marks for r in rubrics)
+    return render_template('admin/examination_detail.html', exam=exam,
+                           rubrics=rubrics, rubric_total=rubric_total)
+
+@blueprint.route('/examinations/<int:exam_id>/edit', methods=['GET', 'POST'])
+def update_examination(exam_id):
+    exam = db.get_or_404(Examination, exam_id)
+    form = ExaminationForm(obj=exam)
+    course_choices(form.course_id)
+    back = url_for('admin.examination_detail', exam_id=exam.id)
+
+    if form.validate_on_submit():
+        rubrics = ExaminationRubrics.query.filter_by(exam_id=exam.id).all()
+        used = sum(r.max_marks for r in rubrics)
+
+        if form.max_marks.data < used:
+            add_error(form.max_marks, f'Rubrics already add up to {used} marks. Lower them first.')
+        else:
+            fill_exam(exam, form)
+            if save('Examination updated.'):
+                return redirect(back)
+
+    return render_template('admin/form.html', form=form, title=f'Edit {exam.exam_name}',
+                           cancel_url=back)
+
+@blueprint.route('/examinations/<int:exam_id>/delete', methods=['POST'])
+def delete_examination(exam_id):
+    exam = db.get_or_404(Examination, exam_id)
+
+    if exam.slots:
+        flash('This examination has slots. Set its status to Cancelled instead of deleting it.', 'danger')
+        return redirect(url_for('admin.examination_detail', exam_id=exam.id))
+
+    ExaminationRubrics.query.filter_by(exam_id=exam.id).delete()
+    db.session.delete(exam)
+    save('Examination deleted.', 'Could not delete the examination.')
+    return redirect(url_for('admin.view_all_examinations'))
