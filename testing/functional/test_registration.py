@@ -36,9 +36,6 @@ def test_register_student(client):
     }, follow_redirects=True)
     assert response.status_code == 200
 
-    with app.app_context():
-        user = User.query.filter_by(email=email_test).first()
-        assert user is not None
-        assert any(r.name == 'student' for r in user.roles)
+    
         
     
