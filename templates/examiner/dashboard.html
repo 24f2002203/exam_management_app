@@ -6,37 +6,6 @@
     <title>Examiner Dashboard</title>
 </head>
 <body>
-<p><a href="{{ url_for('examiner.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
-{% for category, message in get_flashed_messages(with_categories=true) %}
-    <p>{{ category }}: {{ message }}</p>
-{% endfor %}
-
-<h1>Examiner Dashboard</h1>
-
-<h2>My examinations</h2>
-<table border="1">
-    <thead>
-        <tr>
-            <th>Examination</th>
-            <th>Course</th>
-            <th>Date</th>
-            <th>Venue</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for exam in exams %}
-        <tr>
-            <td><a href="{{ url_for('examiner.exam_detail', exam_id=exam.id) }}">{{ exam.exam_name }}</a></td>
-            <td>{{ exam.course.course_code }}</td>
-            <td>{{ exam.exam_date.strftime('%d %b %Y') }}</td>
-            <td>{{ exam.venue }}</td>
-            <td>{{ exam.status }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="5">No examinations for your courses yet.</td></tr>
-        {% endfor %}
-    </tbody>
-</table>
+    <h1>Examiner Dashboard</h1>
 </body>
 </html>

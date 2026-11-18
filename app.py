@@ -6,6 +6,7 @@ from flask_login import LoginManager
 from core.config import LocalDevelopmentConfig, TestingConfig
 from core.database import db 
 from flask_migrate import Migrate
+from apps import register_blueprints
 from flask.cli import with_appcontext
 from core.seed import seed_database
 from flask_wtf.csrf import CSRFProtect
@@ -16,6 +17,7 @@ security = Security()
 
 login_manager = LoginManager()
 
+csrf = CSRFProtect()
 
 #user_datastore = None
 
@@ -45,6 +47,8 @@ def create_app():
     migrate = Migrate(app, db)
     #with app.app_context():
 
+    csrf.init_app(app)
+
     from core.models import User, Role
 
     user_datastore = SQLAlchemySessionUserDatastore(db.session, User, Role)
@@ -53,6 +57,8 @@ def create_app():
     login_manager.init_app(app)
 
     security.init_app(app, user_datastore)
+
+    register_blueprints(app)
 
     @app.cli.command("seed")
     @with_appcontext

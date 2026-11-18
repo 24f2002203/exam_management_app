@@ -7,6 +7,9 @@
 </head>
 <body>
     <h1>Register</h1>
+
+    {{ message }}
+
     <form method="POST">
         {{ form.hidden_tag() }}
 
@@ -34,8 +37,6 @@
             {{ form.password_confirm.label }} 
             {{ form.password_confirm(size=32) }} 
         </p>
-
-
 
         <p>
             {{ form.role.label }} 

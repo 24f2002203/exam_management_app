@@ -110,10 +110,9 @@ def book(slot_id):
         flash('You already have a booking for this examination.')
         return back
 
-    # The (student, slot) pair must be unique, so reuse an old cancelled booking if there is one
-    booking = Booking.query.filter_by(student_id=student.id, slot_id=slot.id).first()
+    booking = Booking.query.filter_by(student_id=student.id, slot_id=slot.slot_id).first()
     if booking is None:
-        booking = Booking(student_id=student.id, slot_id=slot.id)
+        booking = Booking(student_id=student.id, slot_id=slot.slot_id)
         db.session.add(booking)
 
     booking.status = 'Booked'

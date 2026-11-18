@@ -3,6 +3,8 @@ import  os, sys, uuid
 from core.database import db
 from datetime import datetime, UTC
 
+# Association table
+# Primary key on user_id ensures one role per user.
 user_roles = db.Table(
     'user_roles',
     db.Column(
@@ -74,6 +76,8 @@ class StudentProfile(db.Model):
     backref=db.backref('student_profile', uselist=False)
     )
 
+     
+      
 
 class ExaminerProfile(db.Model): 
     __tablename__ = 'examiner_profiles'
@@ -108,6 +112,9 @@ class Course(db.Model):
     semester = db.Column(db.String(20), nullable=False)
     year_of_study = db.Column(db.Integer, nullable=False)
 
+     
+      
+
 class Examination(db.Model):
     __tablename__ = 'examinations'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -135,6 +142,28 @@ class Examination(db.Model):
     status = db.Column(db.String(50), nullable=False, default='Scheduled')  # e.g., "Scheduled", "Completed", "Cancelled"
 
     course = db.relationship('Course', backref='examinations')
+    
+     
+      
+
+class Evaluation(db.Model): 
+    __tablename__ = 'evaluations'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.booking_id'), nullable=False)
+    examiner_id = db.Column(db.Integer, db.ForeignKey('examiner_profiles.id'), nullable=False)
+
+    date_of_evaluation = db.Column(db.DateTime, nullable=False)
+    status = db.Column(db.String(50), nullable=False, default='Pending')  # e.g., "Pending", "Completed"
+    remarks = db.Column(db.Text, nullable=True)
+
+    submitted_at = db.Column(db.DateTime, nullable=True)
+    marks_obtained = db.Column(db.Float, nullable=True)
+
+    booking = db.relationship('Booking', backref='evaluations')
+    examiner = db.relationship('ExaminerProfile', backref='evaluations')
+
+     
+      
 
 
 class ExaminationSlot(db.Model): 
@@ -184,42 +213,8 @@ class Booking(db.Model):
     slot = db.relationship('ExaminationSlot', backref='bookings')
     student = db.relationship('StudentProfile', backref='bookings')
 
-
-class ExaminationRubrics(db.Model): 
-    __tablename__ = 'examination_rubrics'
-    rubric_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    exam_id = db.Column(db.Integer, db.ForeignKey('examinations.id'), nullable=False)
-
-    criteria = db.Column(db.Text, nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    weightage = db.Column(db.Float, nullable=False)
-    max_marks = db.Column(db.Integer, nullable=False)
-
-    display_order = db.Column(db.Integer, nullable=False)
-
-class BookingReschedules(db.Model): 
-    __tablename__ = 'booking_reschedules'
-    reschedule_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.booking_id'), nullable=False)
-    old_slot_id = db.Column(db.Integer, db.ForeignKey('examination_slots.slot_id'), nullable=False)
-    new_slot_id = db.Column(db.Integer, db.ForeignKey('examination_slots.slot_id'), nullable=False)
-
-    reschedule_reason = db.Column(db.Text, nullable=True)
-    rescheduled_at = db.Column(
-    db.DateTime(timezone=True),
-    default=lambda: datetime.now(UTC)
-)
-    booking = db.relationship('Booking', backref='reschedules')
-
-    old_slot = db.relationship(
-        'ExaminationSlot',
-        foreign_keys=[old_slot_id]
-    )
-
-    new_slot = db.relationship(
-        'ExaminationSlot',
-        foreign_keys=[new_slot_id]
-    )
+     
+      
 
 class SlotExaminerChanges(db.Model): 
     __tablename__ = 'slot_examiner_changes'
@@ -248,3 +243,66 @@ class SlotExaminerChanges(db.Model):
         'ExaminerProfile',
         foreign_keys=[new_examiner_id]
     )
+    
+
+     
+      
+
+class BookingReschedules(db.Model): 
+    __tablename__ = 'booking_reschedules'
+    reschedule_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.booking_id'), nullable=False)
+    old_slot_id = db.Column(db.Integer, db.ForeignKey('examination_slots.slot_id'), nullable=False)
+    new_slot_id = db.Column(db.Integer, db.ForeignKey('examination_slots.slot_id'), nullable=False)
+
+    reschedule_reason = db.Column(db.Text, nullable=True)
+    rescheduled_at = db.Column(
+    db.DateTime(timezone=True),
+    default=lambda: datetime.now(UTC)
+)
+    booking = db.relationship('Booking', backref='reschedules')
+
+    old_slot = db.relationship(
+        'ExaminationSlot',
+        foreign_keys=[old_slot_id]
+    )
+
+    new_slot = db.relationship(
+        'ExaminationSlot',
+        foreign_keys=[new_slot_id]
+    )
+
+     
+      
+
+class ExaminationRubrics(db.Model): 
+    __tablename__ = 'examination_rubrics'
+    rubric_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    exam_id = db.Column(db.Integer, db.ForeignKey('examinations.id'), nullable=False)
+
+    criteria = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    weightage = db.Column(db.Float, nullable=False)
+    max_marks = db.Column(db.Integer, nullable=False)
+
+    display_order = db.Column(db.Integer, nullable=False)
+
+
+class EvaluationScores(db.Model): 
+    __tablename__ = 'evaluation_scores'
+    __table_args__ = (
+    db.UniqueConstraint(
+        'evaluation_id',
+        'rubric_id',
+        name='unique_evaluation_rubric'
+    ),
+)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    evaluation_id = db.Column(db.Integer, db.ForeignKey('evaluations.id'), nullable=False)
+    rubric_id = db.Column(db.Integer, db.ForeignKey('examination_rubrics.rubric_id'), nullable=False)
+
+    score = db.Column(db.Float, nullable=False)
+    feedback = db.Column(db.Text, nullable=True)
+
+    evaluation = db.relationship('Evaluation', backref='scores')
+    rubric = db.relationship('ExaminationRubrics', backref='scores')
