@@ -1,0 +1,10 @@
+.venv/
+local_setup.sh
+local_run.sh
+local_testing.sh
+.env
+*__pycache__
+*_cache
+db_directory
+migrations/
+*.log
