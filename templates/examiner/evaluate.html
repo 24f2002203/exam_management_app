@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluate</title>
+</head>
+<body>
+<p><a href="{{ url_for('examiner.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>Evaluate {{ booking.student.user.first_name }} {{ booking.student.user.last_name }}</h1>
+<p>{{ exam.exam_name }} ({{ booking.student.roll_number }})</p>
+
+<form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {% for rubric in rubrics %}
+        <p>
+            <label>{{ rubric.criteria }} (max {{ rubric.max_marks }})</label><br>
+            {% if rubric.description %}{{ rubric.description }}<br>{% endif %}
+            <input type="number" step="any" min="0" max="{{ rubric.max_marks }}"
+                   name="score_{{ rubric.rubric_id }}"
+                   value="{{ old_scores.get(rubric.rubric_id, '') }}" required>
+        </p>
+    {% endfor %}
+
+    <p>
+        <label>Remarks</label><br>
+        <textarea name="remarks">{{ evaluation.remarks or '' if evaluation else '' }}</textarea>
+    </p>
+
+    <button type="submit">Submit marks</button>
+    <a href="{{ back }}">Cancel</a>
+</form>
+</body>
+</html>

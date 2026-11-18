@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'Edit slot' if slot else 'New slot' }}</title>
+</head>
+<body>
+<p><a href="{{ url_for('examiner.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>{{ 'Edit slot' if slot else 'New slot' }} for {{ exam.exam_name }}</h1>
+
+<form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <p>
+        <label>Date</label><br>
+        <input type="date" name="slot_date" value="{{ slot.slot_date.strftime('%Y-%m-%d') if slot else '' }}" required>
+    </p>
+    <p>
+        <label>Start time</label><br>
+        <input type="time" name="start_time" value="{{ slot.start_time.strftime('%H:%M') if slot else '' }}" required>
+    </p>
+    <p>
+        <label>End time</label><br>
+        <input type="time" name="end_time" value="{{ slot.end_time.strftime('%H:%M') if slot else '' }}" required>
+    </p>
+    <p>
+        <label>Seats (1 to {{ exam.max_students }})</label><br>
+        <input type="number" name="seats" min="1" max="{{ exam.max_students }}" value="{{ slot.available_seats if slot else '' }}" required>
+    </p>
+
+    <button type="submit">Save slot</button>
+    <a href="{{ back }}">Cancel</a>
+</form>
+</body>
+</html>
