@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Courses</title>
+</head>
+<body>
+<p><a href="{{ url_for('admin.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>All Courses</h1>
+
+<form method="get">
+    <input name="q" value="{{ q }}" placeholder="Search courses">
+    <button type="submit">Search</button>
+</form>
+
+<p><a href="{{ url_for('admin.create_course') }}">Add a course</a></p>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Sno.</th>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Department</th>
+            <th>Program</th>
+            <th>Credits</th>
+            <th>Semester</th>
+            <th>Year</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for course in page.items %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ course.course_code }}</td>
+            <td>{{ course.course_name }}</td>
+            <td>{{ course.department }}</td>
+            <td>{{ course.program }}</td>
+            <td>{{ course.credits }}</td>
+            <td>{{ course.semester }}</td>
+            <td>{{ course.year_of_study }}</td>
+            <td>
+                <a href="{{ url_for('admin.update_course', course_id=course.id) }}">Edit</a>
+                <form method="post" action="{{ url_for('admin.delete_course', course_id=course.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Delete</button>
+</form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9">No courses found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p>
+    {% if page.has_prev %}<a href="{{ url_for(request.endpoint, **dict(request.args.to_dict(), page=page.prev_num)) }}">Previous</a>{% endif %}
+    Page {{ page.page }} of {{ page.pages }}
+    {% if page.has_next %}<a href="{{ url_for(request.endpoint, **dict(request.args.to_dict(), page=page.next_num)) }}">Next</a>{% endif %}
+</p>
+</body>
+</html>

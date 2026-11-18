@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search</title>
+</head>
+<body>
+<p><a href="{{ url_for('admin.dashboard') }}">Home</a> <a href="{{ url_for_security('logout') }}">Logout</a></p>
+{% for category, message in get_flashed_messages(with_categories=true) %}
+    <p>{{ category }}: {{ message }}</p>
+{% endfor %}
+
+<h1>Search results for "{{ q }}"</h1>
+
+{% if results %}
+
+    <h2>Students</h2>
+    <ul>
+        {% for s in results.students %}
+            <li>{{ s.user.first_name }} {{ s.user.last_name }} ({{ s.roll_number }}, {{ s.user.email }})</li>
+        {% else %}
+            <li>None</li>
+        {% endfor %}
+    </ul>
+
+    <h2>Examiners</h2>
+    <ul>
+        {% for e in results.examiners %}
+            <li>
+                <a href="{{ url_for('admin.update_examiner', examiner_id=e.id) }}">
+                    {{ e.user.first_name }} {{ e.user.last_name }}</a>
+                ({{ e.department }}, {{ e.designation }})
+            </li>
+        {% else %}
+            <li>None</li>
+        {% endfor %}
+    </ul>
+
+    <h2>Examinations</h2>
+    <ul>
+        {% for exam in results.examinations %}
+            <li>
+                <a href="{{ url_for('admin.examination_detail', exam_id=exam.id) }}">{{ exam.exam_name }}</a>
+                ({{ exam.course.course_code }})
+            </li>
+        {% else %}
+            <li>None</li>
+        {% endfor %}
+    </ul>
+
+    <h2>Bookings</h2>
+    <ul>
+        {% for b in results.bookings %}
+            <li>
+                <a href="{{ url_for('admin.booking_detail', booking_id=b.booking_id) }}">Booking {{ b.booking_id }}</a>
+                - {{ b.student.user.first_name }} {{ b.student.user.last_name }}, {{ b.slot.exam.exam_name }}
+            </li>
+        {% else %}
+            <li>None</li>
+        {% endfor %}
+    </ul>
+
+    <h2>Courses</h2>
+    <ul>
+        {% for c in results.courses %}
+            <li>
+                {{ c.course_name }} ( {{ c.course_code }}, {{ c.course_description }}, {{ c.program}})
+            </li>
+        {% endfor %}
+    </ul>
+
+{% else %}
+    <p>Type something in the search box on the home page.</p>
+{% endif %}
+</body>
+</html>
